@@ -31,6 +31,12 @@ The initial library is a carefully selected first edition, not a claim that ever
 - [National Council for Hotel Management & Catering Technology: Indian Culinary Arts](https://ihmgoa.gov.in/uploads/content_files/0_143_1716895344.pdf)
 - [India eCookbook: regional cooking culture](https://mecs.org.uk/wp-content/uploads/2022/03/India-eCookbook-V2.1.pdf)
 
+## Food photos and recipe detail
+
+Dish photos are loaded from Wikimedia Commons only when the image title matches the dish, and each image links back to its source and license. Photos need an internet connection; when no matching image is available, the recipe remains usable without showing a misleading picture. Recipe pages include scaled ingredient quantities, a prep checklist, equipment guidance, step-by-step cooking cues, kitchen notes, and step progress.
+
+The 100-recipe starter library is not literally every Indian dish. Regional and community cooking is vast and includes family and oral traditions; the atlas is designed to grow with more documented contributions.
+
 ## Run
 
 Open `index.html` in a modern browser or serve the folder over HTTPS. The app uses vanilla JavaScript and local storage; no account or backend is required. Favourites and pantry entries stay on the current browser.
