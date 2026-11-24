@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f7f2e9">
+  <meta name="description" content="Rasoi Atlas: discover Indian recipes by region, cook with what you have, and make thoughtful ingredient swaps.">
+  <title>Rasoi Atlas — Indian food, one kitchen at a time</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="data.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="wordmark" href="../../" aria-label="Studio Makhara home"><span class="seal">र</span><span>RASOI <i>ATLAS</i></span></a>
+    <nav class="header-nav" aria-label="Main navigation"><a href="#discover">Discover</a><a href="#pantry">Cook from my pantry</a><button id="saved-link" class="saved-link">♡ <span>Saved</span><b id="saved-count">0</b></button></nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy"><p class="eyebrow"><span class="eyebrow-dot"></span> A GROWING RECIPE ATLAS · INDIA</p>
+        <h1>Good food finds<br>its <em>way home.</em></h1>
+        <p class="hero-text">Explore the kitchens of India, one deeply loved dish at a time. Start with a place, a craving, or what’s already in your kitchen.</p>
+        <a class="hero-link" href="#discover">WANDER THE ATLAS <span>↓</span></a>
+      </div>
+      <div class="hero-art" aria-hidden="true"><div class="sun"></div><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="spice spice-one">✳</div><div class="spice spice-two">✳</div><span class="hero-note">NORTH · SOUTH<br>EAST · WEST · MORE</span><span class="hero-no">001</span></div>
+      <div class="hero-foot"><span>36 RECIPES TO BEGIN WITH</span><span>FROM SIX CULINARY REGIONS</span><span>MADE FOR REAL HOME KITCHENS</span></div>
+    </section>
+
+    <section id="pantry" class="pantry-section">
+      <div class="section-kicker"><span>01</span><span>THE WHAT'S-IN-MY-KITCHEN FINDER</span></div>
+      <div class="pantry-grid">
+        <div><h2>Tell us what<br>you <em>have.</em></h2><p>Type ingredients separated by commas. We’ll rank dishes you can make now, then show the nearest options and what’s missing.</p></div>
+        <div class="pantry-entry"><label for="pantry-input">YOUR INGREDIENTS</label><textarea id="pantry-input" rows="3" placeholder="e.g. potatoes, peas, yogurt, cumin, rice"></textarea><div class="pantry-actions"><button id="find-pantry" class="button button-dark">Find my dishes <span>↗</span></button><button id="pantry-clear" class="link-button">Clear</button></div><div id="pantry-chips" class="pantry-chips" aria-live="polite"></div></div>
+      </div>
+      <p class="pantry-note"><span>✳</span> Pantry matches are suggestions. Check every ingredient and label yourself, especially for allergies.</p>
+    </section>
+
+    <section id="discover" class="discover-section">
+      <div class="discover-head"><div><div class="section-kicker"><span>02</span><span>THE RECIPE ATLAS</span></div><h2>What sounds <em>good?</em></h2></div><button id="clear-filters" class="link-button">Reset filters ↺</button></div>
+      <div class="filters">
+        <label class="search-box"><span>⌕</span><input id="search" type="search" placeholder="Search a dish, ingredient, or state…" autocomplete="off"></label>
+        <select id="region-filter" aria-label="Filter by region"><option value="all">All regions</option><option>North</option><option>South</option><option>East</option><option>West</option><option>Central</option><option>Northeast</option></select>
+        <select id="diet-filter" aria-label="Filter by diet"><option value="all">Any kitchen</option><option value="vegetarian">Vegetarian</option><option value="vegan">Vegan</option><option value="nonveg">Non-vegetarian</option></select>
+        <select id="time-filter" aria-label="Filter by cooking time"><option value="all">Any time</option><option value="30">Under 30 min</option><option value="45">Under 45 min</option><option value="60">Under 1 hour</option></select>
+      </div>
+      <div id="active-message" class="active-message" aria-live="polite"></div>
+      <div class="results-bar"><span id="results-count"></span><div class="sort-control"><label for="sort">Sort</label><select id="sort"><option value="featured">Featured</option><option value="quick">Quickest</option><option value="az">A to Z</option></select></div></div>
+      <div id="recipe-grid" class="recipe-grid"></div>
+      <div id="empty-state" class="empty-state" hidden><span>✳</span><h3>No dishes found for that combination.</h3><p>Try another ingredient or widen your filters.</p><button id="empty-reset" class="button button-outline">Show all recipes</button></div>
+      <div class="library-footer"><span>THE ATLAS IS MADE TO GROW.</span><span>Suggest a family recipe or a regional correction: <a href="https://github.com/makhara184/makhara184/issues" target="_blank" rel="noreferrer">contribute on GitHub ↗</a></span></div>
+    </section>
+
+    <section class="trust-band"><span class="trust-mark">✳</span><div><p class="eyebrow">COOK WITH CARE</p><h2>A swap can help.<br>It can also change a dish.</h2></div><p>Every substitution is labelled by how closely it works and what it changes. Some ingredients have no honest 1:1 replacement. Allergy-safe cooking needs label and cross-contact checks that an app cannot do for you.</p></section>
+  </main>
+  <footer class="site-footer"><a class="wordmark" href="../../"><span class="seal">र</span><span>RASOI <i>ATLAS</i></span></a><span>A growing map of India's kitchens.</span><span><a href="../../">Studio Makhara home ↗</a></span></footer>
+
+  <dialog id="recipe-dialog" class="recipe-dialog">
+    <form method="dialog"><button class="close-button" aria-label="Close recipe">×</button></form>
+    <div id="recipe-detail"></div>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
