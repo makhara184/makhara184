@@ -55,15 +55,16 @@
     }).join("");
     hydrateCardPhotos(list);
   }
-  const photoCache = read("photos-v3", {});
+  // Version 4 intentionally discards the old fuzzy matches saved by earlier releases.
+  const photoCache = read("photos-v4", {});
   const photoPending = new Map();
-  function rememberPhotos(){write("photos-v3",photoCache);}
+  function rememberPhotos(){write("photos-v4",photoCache);}
   function showPhoto(slot, photo, dish){
     if(!slot||!photo?.thumb)return;
     slot.classList.add("has-photo");
     let img=slot.querySelector(".food-photo");
-    if(!img){img=document.createElement("img");img.className="food-photo";img.alt="";img.loading="lazy";slot.appendChild(img);}
-    img.alt="Example photo of "+dish;
+    if(!img){img=document.createElement("img");img.className="food-photo";img.loading="lazy";slot.appendChild(img);}
+    img.alt="Dish photo of "+dish;
     img.src=photo.thumb;
     img.onerror=()=>{slot.classList.remove("has-photo");img.remove();};
     let credit=slot.querySelector(".photo-credit");
@@ -76,25 +77,26 @@
     const task=(async()=>{
       try{
         const query=encodeURIComponent('filetype:bitmap "'+recipe.title+'"');
-        const endpoint='https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch='+query+'&gsrnamespace=6&gsrlimit=1&prop=imageinfo&iiprop=url%7Cextmetadata&iiurlwidth=900&format=json&origin=*';
+        const endpoint='https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch='+query+'&gsrnamespace=6&gsrlimit=12&prop=imageinfo&iiprop=url%7Cextmetadata&iiurlwidth=900&format=json&origin=*';
         const response=await fetch(endpoint);
         if(!response.ok)throw new Error("Photo search unavailable");
         const json=await response.json();
-        const page=Object.values(json.query?.pages||{})[0];
-        const info=page?.imageinfo?.[0];
-        if(!info?.thumburl){photoCache[recipe.id]=null;rememberPhotos();return null;}
-        const ignored=new Set("indian india north south east west central northeast punjabi assamese bengali odia odisha kerala kashmiri gujarati rajasthani maharashtrian mumbai goan tamil karnataka manipuri mizo naga nagaland bihar bihari andhra telangana telugu tripuri meghalaya meghalayan arunachal uttar pradesh madhya madhya pradesh with from style food dish recipe curry masala fresh traditional".split(" "));
-        const wanted=norm(recipe.title).split(" ").filter(t=>t.length>2&&!ignored.has(t));
-        const filenameText=norm((page.title||"").replace(/^file\s/,""));
-        const filename=filenameText.split(" ");
-        if(wanted.length&&!wanted.some(t=>filename.includes(t))){photoCache[recipe.id]=null;rememberPhotos();return null;}
+        const ignored=new Set("indian india north south east west central northeast punjabi assamese bengali odia odisha kerala kashmiri gujarati rajasthani maharashtrian mumbai goan tamil karnataka manipuri mizo naga nagaland bihar bihari andhra telangana telugu tripuri meghalaya meghalayan arunachal uttar pradesh madhya pradesh with from style food dish recipe traditional".split(" "));
         const placeNames=["jammu","kashmir","punjab","himachal","uttarakhand","haryana","delhi","uttar pradesh","rajasthan","gujarat","maharashtra","goa","madhya pradesh","chhattisgarh","bihar","jharkhand","odisha","west bengal","sikkim","assam","arunachal pradesh","nagaland","manipur","mizoram","tripura","meghalaya","telangana","andhra pradesh","tamil nadu","kerala","karnataka"];
-        const imagePlaces=placeNames.filter(place=>filenameText.includes(place));
+        const wanted=norm(recipe.title).split(" ").filter(t=>t.length>2&&!ignored.has(t));
         const recipePlaces=norm(recipe.state+" "+recipe.region);
-        if(imagePlaces.length&&!imagePlaces.some(place=>recipePlaces.includes(place))){photoCache[recipe.id]=null;rememberPhotos();return null;}
-        const meta=info.extmetadata||{};
-        const license=(meta.LicenseShortName?.value||"").replace(/<[^>]*>/g,"").trim();
-        const title=page.title||"";
+        const pages=Object.values(json.query?.pages||{});
+        const match=pages.find(page=>{
+          const filename=norm((page.title||"").replace(/^file\s/,""));
+          if(!wanted.length||!wanted.every(t=>filename.split(" ").includes(t)))return false;
+          const imagePlaces=placeNames.filter(place=>filename.includes(place));
+          if(imagePlaces.length&&!imagePlaces.some(place=>recipePlaces.includes(place)))return false;
+          return !!page.imageinfo?.[0]?.thumburl;
+        });
+        const info=match?.imageinfo?.[0];
+        if(!info?.thumburl){photoCache[recipe.id]=null;rememberPhotos();return null;}
+        const license=(info.extmetadata?.LicenseShortName?.value||"").replace(/<[^>]*>/g,"").trim();
+        const title=match.title||"";
         const photo={thumb:info.thumburl,page:"https://commons.wikimedia.org/wiki/"+encodeURIComponent(title.replace(/ /g,"_")),license};
         photoCache[recipe.id]=photo;rememberPhotos();return photo;
       }catch{photoCache[recipe.id]=null;rememberPhotos();return null;}
