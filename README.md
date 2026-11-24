@@ -19,7 +19,7 @@ A responsive, installable portfolio of ten focused browser apps. Each app has it
 
 ## Run or publish
 
-Open `index.html` directly for basic use, or serve this folder from localhost/HTTPS to enable app installation and service-worker caching. GitHub Pages deployment is configured in `.github/workflows/pages.yml`; after Pages is set to **GitHub Actions** in repository settings, pushes to `main` publish the site.
+Open `index.html` directly for basic use, or serve this folder from localhost/HTTPS to enable app installation and service-worker caching. GitHub Pages deployment is configured in `.github/workflows/pages.yml`; the first Actions run enables Pages for the repository, then publishes the site. Subsequent pushes to `main` publish updates.
 
 ## Privacy and limits
 
@@ -30,4 +30,3 @@ The visual map in GeoPin is a coordinate plot rather than a street map, and its 
 ## Technology
 
 Vanilla HTML, CSS, and JavaScript keep the suite fast, portable, dependency-free, and easy to host. The existing Swift and Python projects can continue to evolve in their dedicated repositories.
-
