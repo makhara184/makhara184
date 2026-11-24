@@ -52,9 +52,9 @@
     }).join("");
     hydrateCardPhotos(list);
   }
-  const photoCache = read("photos", {});
+  const photoCache = read("photos-v2", {});
   const photoPending = new Map();
-  function rememberPhotos(){write("photos",photoCache);}
+  function rememberPhotos(){write("photos-v2",photoCache);}
   function showPhoto(slot, photo, dish){
     if(!slot||!photo?.thumb)return;
     slot.classList.add("has-photo");
@@ -80,6 +80,10 @@
         const page=Object.values(json.query?.pages||{})[0];
         const info=page?.imageinfo?.[0];
         if(!info?.thumburl){photoCache[recipe.id]=null;rememberPhotos();return null;}
+        const ignored=new Set("indian india north south east west central northeast punjabi assamese bengali odia odisha kerala kashmiri gujarati rajasthani maharashtrian mumbai goan tamil karnataka manipuri mizo naga nagaland bihar bihari andhra telangana telugu tripuri meghalaya meghalayan arunachal uttar pradesh madhya madhya pradesh with from style food dish recipe curry masala fresh traditional".split(" "));
+        const wanted=norm(recipe.title).split(" ").filter(t=>t.length>2&&!ignored.has(t));
+        const filename=norm((page.title||"").replace(/^file\s/,"")).split(" ");
+        if(wanted.length&&!wanted.some(t=>filename.includes(t))){photoCache[recipe.id]=null;rememberPhotos();return null;}
         const meta=info.extmetadata||{};
         const license=(meta.LicenseShortName?.value||"").replace(/<[^>]*>/g,"").trim();
         const title=page.title||"";
