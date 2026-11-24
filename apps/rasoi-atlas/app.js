@@ -48,8 +48,65 @@
     grid.innerHTML=list.map((r,i)=>{
       const sc=activePantry.length?score(r,activePantry):null;
       const percent=sc?'<span class="match-pill">'+(sc.percent===100?"READY NOW":sc.found+"/"+sc.total+" ingredients")+'</span>':"";
-      return '<article class="recipe-card" tabindex="0" role="button" data-open="'+esc(r.id)+'"><div class="recipe-art art-'+(i%6)+'"><span class="recipe-region">'+esc(r.region.toUpperCase())+' · '+esc(r.state.toUpperCase())+'</span><button class="heart '+(saved.has(r.id)?"is-saved":"")+'" data-save="'+esc(r.id)+'" aria-label="'+(saved.has(r.id)?"Remove from":"Save")+' favourites">'+(saved.has(r.id)?"♥":"♡")+'</button><span class="dish-initial">'+esc(r.title.slice(0,1))+'</span></div><div class="recipe-card-body"><div class="recipe-meta"><span>'+esc(r.kind.toUpperCase())+'</span><span>'+r.minutes+' MIN</span></div><h3>'+esc(r.title)+'</h3><p>'+esc(r.description)+'</p><div class="card-bottom">'+percent+'<span>'+ (r.vegan?"VEGAN":r.vegetarian?"VEGETARIAN":"CONTAINS MEAT / FISH")+'</span><b>↗</b></div></div></article>';
+      return '<article class="recipe-card" tabindex="0" role="button" data-open="'+esc(r.id)+'"><div class="recipe-art art-'+(i%6)+'" data-image-slot="'+esc(r.id)+'"><span class="recipe-region">'+esc(r.region.toUpperCase())+' · '+esc(r.state.toUpperCase())+'</span><button class="heart '+(saved.has(r.id)?"is-saved":"")+'" data-save="'+esc(r.id)+'" aria-label="'+(saved.has(r.id)?"Remove from":"Save")+' favourites">'+(saved.has(r.id)?"♥":"♡")+'</button><span class="dish-initial">'+esc(r.title.slice(0,1))+'</span></div><div class="recipe-card-body"><div class="recipe-meta"><span>'+esc(r.kind.toUpperCase())+'</span><span>'+r.minutes+' MIN</span></div><h3>'+esc(r.title)+'</h3><p>'+esc(r.description)+'</p><div class="card-bottom">'+percent+'<span>'+ (r.vegan?"VEGAN":r.vegetarian?"VEGETARIAN":"CONTAINS MEAT / FISH")+'</span><b>↗</b></div></div></article>';
     }).join("");
+    hydrateCardPhotos(list);
+  }
+  const photoCache = read("photos", {});
+  const photoPending = new Map();
+  function rememberPhotos(){write("photos",photoCache);}
+  function showPhoto(slot, photo, dish){
+    if(!slot||!photo?.thumb)return;
+    slot.classList.add("has-photo");
+    let img=slot.querySelector(".food-photo");
+    if(!img){img=document.createElement("img");img.className="food-photo";img.alt="";img.loading="lazy";slot.appendChild(img);}
+    img.alt="Example photo of "+dish;
+    img.src=photo.thumb;
+    img.onerror=()=>{slot.classList.remove("has-photo");img.remove();};
+    let credit=slot.querySelector(".photo-credit");
+    if(!credit){credit=document.createElement("a");credit.className="photo-credit";credit.target="_blank";credit.rel="noreferrer";slot.appendChild(credit);}
+    credit.href=photo.page;credit.textContent="Photo: Wikimedia Commons · "+(photo.license||"see source");
+  }
+  async function findPhoto(recipe){
+    if(Object.prototype.hasOwnProperty.call(photoCache,recipe.id))return photoCache[recipe.id];
+    if(photoPending.has(recipe.id))return photoPending.get(recipe.id);
+    const task=(async()=>{
+      try{
+        const query=encodeURIComponent('filetype:bitmap "'+recipe.title+'"');
+        const endpoint='https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch='+query+'&gsrnamespace=6&gsrlimit=1&prop=imageinfo&iiprop=url%7Cextmetadata&iiurlwidth=900&format=json&origin=*';
+        const response=await fetch(endpoint);
+        if(!response.ok)throw new Error("Photo search unavailable");
+        const json=await response.json();
+        const page=Object.values(json.query?.pages||{})[0];
+        const info=page?.imageinfo?.[0];
+        if(!info?.thumburl){photoCache[recipe.id]=null;rememberPhotos();return null;}
+        const meta=info.extmetadata||{};
+        const license=(meta.LicenseShortName?.value||"").replace(/<[^>]*>/g,"").trim();
+        const title=page.title||"";
+        const photo={thumb:info.thumburl,page:"https://commons.wikimedia.org/wiki/"+encodeURIComponent(title.replace(/ /g,"_")),license};
+        photoCache[recipe.id]=photo;rememberPhotos();return photo;
+      }catch{photoCache[recipe.id]=null;rememberPhotos();return null;}
+    })();
+    photoPending.set(recipe.id,task);
+    const result=await task;photoPending.delete(recipe.id);return result;
+  }
+  function hydrateCardPhotos(list){
+    const slots=[...grid.querySelectorAll("[data-image-slot]")];
+    const observer=window.IntersectionObserver?new IntersectionObserver(entries=>entries.forEach(entry=>{
+      if(!entry.isIntersecting)return;
+      observer.unobserve(entry.target);
+      const recipe=recipes.find(r=>r.id===entry.target.dataset.imageSlot);
+      if(!recipe)return;
+      if(photoCache[recipe.id])showPhoto(entry.target,photoCache[recipe.id],recipe.title);
+      else findPhoto(recipe).then(photo=>showPhoto(entry.target,photo,recipe.title));
+    }),{rootMargin:"240px"}):null;
+    slots.forEach(slot=>{
+      const recipe=recipes.find(r=>r.id===slot.dataset.imageSlot);
+      if(!recipe)return;
+      if(photoCache[recipe.id])showPhoto(slot,photoCache[recipe.id],recipe.title);
+      else if(observer)observer.observe(slot);
+      else findPhoto(recipe).then(photo=>showPhoto(slot,photo,recipe.title));
+    });
   }
   function showRecipe(id) {
     const r=recipes.find(x=>x.id===id); if(!r)return; current=r; servings=r.serves; checks=new Set(); renderDetail(); dialog.showModal();
@@ -64,7 +121,10 @@
       const opt=i.optional?" · optional":"";
       return '<li class="detail-ingredient"><label><input type="checkbox" data-check="'+n+'" '+(checks.has("i"+n)?"checked":"")+'> <span><strong>'+esc(amount+' '+unit+' '+i.name)+'</strong><small>'+esc(opt.trim()||"")+'</small></span></label>'+(alternatives.length?'<details class="swap"><summary>Swap options</summary><div>'+alternatives.map(a=>'<p><b>'+esc(a.name)+'</b> · '+esc(a.ratio)+' <span class="swap-level level-'+esc(a.level)+'">'+esc(a.level==="no-direct"?"NO DIRECT SWAP":a.level.toUpperCase())+'</span><br><small>'+esc(a.note)+'</small></p>').join("")+'</div></details>':'<details class="swap"><summary>No dependable swap reviewed</summary><div><p><b>No direct replacement listed</b> <span class="swap-level level-no-direct">NO DIRECT SWAP</span><br><small>For this recipe, leaving it out or choosing another dish may be more reliable. Omitting it can change the flavour or texture. Do not use an alternative for allergy-sensitive cooking without checking labels and cross-contact.</small></p></div></details>')+'</li>';
     }).join("");
-    $("#recipe-detail").innerHTML='<div class="detail-hero"><p class="eyebrow">'+esc(r.region.toUpperCase())+' · '+esc(r.state.toUpperCase())+' · '+r.minutes+' MIN</p><h2>'+esc(r.title)+'</h2><p>'+esc(r.description)+'</p><div class="detail-tools"><label>Serves <button type="button" data-servings="-1" aria-label="Fewer servings">−</button> <b>'+servings+'</b> <button type="button" data-servings="1" aria-label="More servings">+</button></label><button type="button" class="button button-outline" id="print-recipe">Print recipe</button><button type="button" class="button button-outline" id="save-detail">'+(saved.has(r.id)?"♥ Saved":"♡ Save recipe")+'</button></div></div><div class="detail-columns"><section><h3>Gather your ingredients</h3><ul class="ingredient-list">'+ingredientRows+'</ul><p class="allergy-note">Swap notes are cooking guidance, not allergy advice. Check labels and prevent cross-contact.</p></section><section><h3>Cook it, step by step</h3><ol class="step-list">'+r.steps.map((s,n)=>'<li><label><input type="checkbox" data-step="'+n+'" '+(checks.has("s"+n)?"checked":"")+'> <span>'+esc(s)+'</span></label></li>').join("")+'</ol>'+(r.tips?'<aside class="recipe-tip"><b>KITCHEN NOTE</b><p>'+esc(r.tips)+'</p></aside>':"")+'</section></div><div class="source-note"><b>About this version</b><p>Recipes in this growing atlas are practical home-kitchen interpretations. Methods and ingredient choices vary between families and regions; use the linked references as a starting point.</p><div>'+sources.map(s=>'<a href="'+esc(s.url)+'" target="_blank" rel="noreferrer">'+esc(s.label)+' ↗</a>').join("")+'</div></div>';
+    $("#recipe-detail").innerHTML='<div class="detail-photo-slot" data-image-slot="'+esc(r.id)+'"></div><div class="detail-hero"><p class="eyebrow">'+esc(r.region.toUpperCase())+' · '+esc(r.state.toUpperCase())+' · '+r.minutes+' MIN</p><h2>'+esc(r.title)+'</h2><p>'+esc(r.description)+'</p><div class="detail-tools"><label>Serves <button type="button" data-servings="-1" aria-label="Fewer servings">−</button> <b>'+servings+'</b> <button type="button" data-servings="1" aria-label="More servings">+</button></label><button type="button" class="button button-outline" id="print-recipe">Print recipe</button><button type="button" class="button button-outline" id="save-detail">'+(saved.has(r.id)?"♥ Saved":"♡ Save recipe")+'</button></div></div><div class="detail-columns"><section><h3>Gather your ingredients</h3><ul class="ingredient-list">'+ingredientRows+'</ul><p class="allergy-note">Swap notes are cooking guidance, not allergy advice. Check labels and prevent cross-contact.</p></section><section><h3>Cook it, step by step</h3><ol class="step-list">'+r.steps.map((s,n)=>'<li><label><input type="checkbox" data-step="'+n+'" '+(checks.has("s"+n)?"checked":"")+'> <span>'+esc(s)+'</span></label></li>').join("")+'</ol>'+(r.tips?'<aside class="recipe-tip"><b>KITCHEN NOTE</b><p>'+esc(r.tips)+'</p></aside>':"")+'</section></div><div class="source-note"><b>About this version</b><p>Recipes in this growing atlas are practical home-kitchen interpretations. Methods and ingredient choices vary between families and regions; use the linked references as a starting point.</p><div>'+sources.map(s=>'<a href="'+esc(s.url)+'" target="_blank" rel="noreferrer">'+esc(s.label)+' ↗</a>').join("")+'</div></div>';
+    const detailPhoto=$("#recipe-detail .detail-photo-slot");
+    if(photoCache[r.id])showPhoto(detailPhoto,photoCache[r.id],r.title);
+    else findPhoto(r).then(photo=>showPhoto(detailPhoto,photo,r.title));
     $("#recipe-detail").querySelectorAll("[data-servings]").forEach(b=>b.onclick=()=>{servings=Math.max(1,Math.min(20,servings+Number(b.dataset.servings)));renderDetail()});
     $("#recipe-detail").querySelectorAll("[data-check]").forEach(b=>b.onchange=()=>{b.checked?checks.add("i"+b.dataset.check):checks.delete("i"+b.dataset.check)});
     $("#recipe-detail").querySelectorAll("[data-step]").forEach(b=>b.onchange=()=>{b.checked?checks.add("s"+b.dataset.step):checks.delete("s"+b.dataset.step)});
