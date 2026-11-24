@@ -15,7 +15,7 @@
   ];
   const defaults = { scene:"topography", palette:"tide", seed:"moonlit-garden", density:56, flow:35, aspect:"landscape" };
   const clone = (v) => JSON.parse(JSON.stringify(v));
-  let state = loadState(), history = [], historyAt = -1, gallery = loadGallery(), toastTimer;
+  let state = loadState(), undoStack = [], historyAt = -1, gallery = loadGallery(), toastTimer;
   let resizeTimer, renderToken = 0;
 
   function loadState() {
@@ -40,10 +40,10 @@
     $("#palettes").innerHTML=palettes.map(p=>`<button class="palette-chip" aria-label="${p.name}" aria-pressed="${p.id===state.palette}" title="${p.name}" data-palette="${p.id}"><span class="palette-swatch" style="--sw1:${p.colors[0]};--sw2:${p.colors[2]};--sw3:${p.colors[4]}"></span></button>`).join("");
     $("#palettes").querySelectorAll("[data-palette]").forEach(b=>b.onclick=()=>change({palette:b.dataset.palette}));
     $("#canvas-stage").className="canvas-stage "+state.aspect;
-    $("#undo").disabled=historyAt<=0;$("#redo").disabled=historyAt<0||historyAt>=history.length-1;
+    $("#undo").disabled=historyAt<=0;$("#redo").disabled=historyAt<0||historyAt>=undoStack.length-1;
     paintGallery();
   }
-  function addHistory() { const copy=clone(state); if(historyAt<history.length-1)history=history.slice(0,historyAt+1); if(JSON.stringify(history.at(-1))!==JSON.stringify(copy)){history.push(copy);if(history.length>40)history.shift();historyAt=history.length-1;} syncControls(); }
+  function addHistory() { const copy=clone(state); if(historyAt<undoStack.length-1)undoStack=undoStack.slice(0,historyAt+1); if(JSON.stringify(undoStack.at(-1))!==JSON.stringify(copy)){undoStack.push(copy);if(undoStack.length>40)undoStack.shift();historyAt=undoStack.length-1;} syncControls(); }
   function change(patch) { state={...state,...patch};persist();addHistory();draw(); }
   function restore(s) { state={...defaults,...s};persist();syncControls();draw(); }
   function setCanvasSize(target=canvas) {
@@ -127,7 +127,7 @@
   function saveArtwork(){const thumb=document.createElement("canvas");thumb.width=360;thumb.height=240;render(thumb.getContext("2d"),360,240,state,renderToken);const item={id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),title:titleCase(state.seed),recipe:clone(state),thumb:thumb.toDataURL("image/jpeg",.72),savedAt:Date.now()};gallery.unshift(item);gallery=gallery.slice(0,24);persistGallery();paintGallery();notify("Saved to your gallery.");}
   function paintGallery(){const g=$("#gallery");if(!g)return;$("#gallery-count").textContent=gallery.length;$("#clear-gallery").hidden=!gallery.length;if(!gallery.length){g.innerHTML='<div class="gallery-empty"><span>✳</span><p>Your gallery is waiting for its first little wonder.</p><small>Save any artwork to keep it here on this device.</small></div>';return;}g.innerHTML=gallery.map(x=>`<article class="gallery-card"><img src="${x.thumb}" alt="Saved ${escapeHtml(x.title)} artwork" data-load="${x.id}"><div class="gallery-meta"><div><strong>${escapeHtml(x.title)}</strong><small>${new Date(x.savedAt).toLocaleDateString()}</small></div><button data-delete="${x.id}" aria-label="Delete ${escapeHtml(x.title)}">×</button></div></article>`).join("");g.querySelectorAll("[data-load]").forEach(el=>el.onclick=()=>{const item=gallery.find(x=>x.id===el.dataset.load);if(item)restore(item.recipe);window.scrollTo({top:0,behavior:"smooth"});});g.querySelectorAll("[data-delete]").forEach(el=>el.onclick=()=>{gallery=gallery.filter(x=>x.id!==el.dataset.delete);persistGallery();paintGallery();});}
   function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-  function shareLink(){const encoded=btoa(unescape(encodeURIComponent(JSON.stringify(state))));const url=new URL(location.href);url.searchParams.set("recipe",encoded);navigator.clipboard?.writeText(url.toString()).then(()=>notify("Share link copied.")).catch(()=>notify("Clipboard unavailable. Copy the URL from your address bar."));history.replaceState(null,"",url);}
+  async function shareLink(){const encoded=btoa(unescape(encodeURIComponent(JSON.stringify(state))));const url=new URL(location.href);url.searchParams.set("recipe",encoded);window.history.replaceState(null,"",url);try{if(!navigator.clipboard)throw new Error("clipboard unavailable");await navigator.clipboard.writeText(url.toString());notify("Share link copied.");}catch{notify("Share link is ready in the address bar.");}}
   function exportRecipe(){downloadBlob(new Blob([JSON.stringify({app:"moire-studio",version:1,recipe:state},null,2)],{type:"application/json"}),slug()+"-recipe.json");notify("Recipe downloaded.");}
   function importRecipe(file){const reader=new FileReader();reader.onload=()=>{try{const obj=JSON.parse(reader.result);const recipe=obj.recipe||obj;if(!scenes.some(x=>x[0]===recipe.scene)||!palettes.some(x=>x.id===recipe.palette))throw Error("Recipe is not from Moiré Studio.");restore({...defaults,...recipe});notify("Recipe imported.");}catch(e){notify(e.message||"Could not read that recipe.");}};reader.readAsText(file);}
   function wire(){
@@ -138,8 +138,8 @@
     $("#aspect").onchange=e=>change({aspect:e.target.value});
     $("#randomize").onclick=()=>{const scene=scenes[Math.floor(Math.random()*scenes.length)][0],pal=palettes[Math.floor(Math.random()*palettes.length)].id;change({scene,palette:pal,seed:randomSeed(),density:20+Math.floor(Math.random()*75),flow:Math.floor(Math.random()*100)});notify("A new world, just for you.");};
     $("#seed-shuffle").onclick=()=>change({seed:randomSeed()});$("#save").onclick=saveArtwork;$("#export").onclick=exportPng;
-    $("#undo").onclick=()=>{if(historyAt>0){historyAt--;restore(history[historyAt]);}};
-    $("#redo").onclick=()=>{if(historyAt<history.length-1){historyAt++;restore(history[historyAt]);}};
+    $("#undo").onclick=()=>{if(historyAt>0){historyAt--;restore(undoStack[historyAt]);}};
+    $("#redo").onclick=()=>{if(historyAt<undoStack.length-1){historyAt++;restore(undoStack[historyAt]);}};
     $("#more").onclick=()=>$("#more-menu").hidden=!$("#more-menu").hidden;$("#share").onclick=shareLink;$("#export-json").onclick=exportRecipe;$("#import-open").onclick=()=>$("#import-file").click();$("#import-file").onchange=e=>{if(e.target.files?.[0])importRecipe(e.target.files[0]);e.target.value="";};
     $("#clear-gallery").onclick=()=>{if(confirm("Remove every saved world from this browser?")){gallery=[];persistGallery();paintGallery();}};
     $("#help-open").onclick=()=>$("#help-dialog").showModal();$("#help-close").onclick=()=>$("#help-dialog").close();
@@ -147,5 +147,5 @@
     document.addEventListener("keydown",e=>{const el=e.target,typing=el.matches("input,textarea,select");if(e.key==="Escape")$("#more-menu").hidden=true;if(!typing&&e.code==="Space"){e.preventDefault();$("#randomize").click();}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){e.preventDefault();(e.shiftKey?$("#redo"):$("#undo")).click();}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="s"){e.preventDefault();saveArtwork();}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="e"){e.preventDefault();exportPng();}});
     window.addEventListener("resize",()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(draw,140);});
   }
-  syncControls();if(history.length===0){history=[clone(state)];historyAt=0;}wire();draw();
+  syncControls();if(undoStack.length===0){undoStack=[clone(state)];historyAt=0;}wire();draw();
 })();
