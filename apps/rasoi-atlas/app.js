@@ -85,8 +85,13 @@
         if(!info?.thumburl){photoCache[recipe.id]=null;rememberPhotos();return null;}
         const ignored=new Set("indian india north south east west central northeast punjabi assamese bengali odia odisha kerala kashmiri gujarati rajasthani maharashtrian mumbai goan tamil karnataka manipuri mizo naga nagaland bihar bihari andhra telangana telugu tripuri meghalaya meghalayan arunachal uttar pradesh madhya madhya pradesh with from style food dish recipe curry masala fresh traditional".split(" "));
         const wanted=norm(recipe.title).split(" ").filter(t=>t.length>2&&!ignored.has(t));
-        const filename=norm((page.title||"").replace(/^file\s/,"")).split(" ");
+        const filenameText=norm((page.title||"").replace(/^file\s/,""));
+        const filename=filenameText.split(" ");
         if(wanted.length&&!wanted.some(t=>filename.includes(t))){photoCache[recipe.id]=null;rememberPhotos();return null;}
+        const placeNames=["jammu","kashmir","punjab","himachal","uttarakhand","haryana","delhi","uttar pradesh","rajasthan","gujarat","maharashtra","goa","madhya pradesh","chhattisgarh","bihar","jharkhand","odisha","west bengal","sikkim","assam","arunachal pradesh","nagaland","manipur","mizoram","tripura","meghalaya","telangana","andhra pradesh","tamil nadu","kerala","karnataka"];
+        const imagePlaces=placeNames.filter(place=>filenameText.includes(place));
+        const recipePlaces=norm(recipe.state+" "+recipe.region);
+        if(imagePlaces.length&&!imagePlaces.some(place=>recipePlaces.includes(place))){photoCache[recipe.id]=null;rememberPhotos();return null;}
         const meta=info.extmetadata||{};
         const license=(meta.LicenseShortName?.value||"").replace(/<[^>]*>/g,"").trim();
         const title=page.title||"";
@@ -150,7 +155,7 @@
   $("#clear-filters").onclick=()=>{$("#search").value="";$("#region-filter").value="all";$("#diet-filter").value="all";$("#time-filter").value="all";$("#sort").value="featured";mode="all";activePantry=[];updateChips();draw()};
   $("#empty-reset").onclick=$("#clear-filters").onclick;
   $("#saved-link").onclick=()=>{mode=mode==="saved"?"all":"saved";$("#discover").scrollIntoView({behavior:"smooth"});draw();};
-  grid.addEventListener("click",e=>{const fave=e.target.closest("[data-save]");if(fave){e.stopPropagation();toggleSaved(fave.dataset.save);return}const card=e.target.closest("[data-open]");if(card)showRecipe(card.dataset.open);});
+  grid.addEventListener("click",e=>{if(e.target.closest("a.photo-credit"))return;const fave=e.target.closest("[data-save]");if(fave){e.stopPropagation();toggleSaved(fave.dataset.save);return}const card=e.target.closest("[data-open]");if(card)showRecipe(card.dataset.open);});
   grid.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.matches("[data-open]")){e.preventDefault();showRecipe(e.target.dataset.open)}});
   dialog.addEventListener("click",e=>{if(e.target===dialog)dialog.close()});
   $("#saved-count").textContent=saved.size;
