@@ -18,6 +18,8 @@
   const pantryTokens = v => [...new Set(String(v).split(/[,;\n]+/).map(x=>canon(x)).filter(Boolean))];
   const ingredientMatch = (item, tokens) => { const name=canon(item.name); return tokens.some(t=>t===name || (t.length>3 && name.includes(t)) || (name.length>3 && t.includes(name))); };
   const score = (r,tokens) => { const needed=r.ingredients.filter(i=>!i.optional); const found=needed.filter(i=>ingredientMatch(i,tokens)); return {found:found.length,total:needed.length,missing:needed.filter(i=>!ingredientMatch(i,tokens)),percent:needed.length?Math.round(found.length/needed.length*100):0}; };
+  const dietFacts = r => { const names=r.ingredients.map(i=>norm(i.name)).join(" "); const meat=/\b(chicken|goat|pork|beef|lamb|fish|hilsa|prawn|shrimp|crab|mutton|meat|anchov|seafood)\b/.test(names); const dairy=/\b(ghee|butter|cream|yogurt|milk|paneer|chhena|cheese|curd)\b/.test(names); const egg=/\begg\b/.test(names); return {vegetarian:!meat&&!egg,vegan:!meat&&!egg&&!dairy}; };
+  const prepGuidance = r => { const method=r.steps.join(" ").toLowerCase(); const tools=[]; if(/pressure cook/.test(method))tools.push("pressure cooker"); if(/steam/.test(method))tools.push("steamer or covered pot with rack"); if(/skillet|griddle|flat pan/.test(method))tools.push("heavy skillet or griddle"); if(/deep-fry|fry until|frying/.test(method))tools.push("deep, heavy pot and heat-safe draining plate"); if(/blend|grind/.test(method))tools.push("grinder or blender"); if(/bake|oven/.test(method))tools.push("preheated oven and baking tray"); if(!tools.length)tools.push("heavy pot and stirring spoon"); const extra=/soak|ferment|marinat|rest covered/.test(method)?"Some soaking, resting, or fermentation time may be needed beyond the cook-time estimate.":"The cook-time estimate can vary with ingredient size and your stove."; return {tools:[...new Set(tools)].join(" · "),extra}; };
   const pretty = s => String(s).replace(/\b\w/g,m=>m.toUpperCase());
   function updateChips() {
     const box=$("#pantry-chips"); if(!box)return;
@@ -31,9 +33,10 @@
       if(q && !hay.includes(q))return false;
       if($("#region-filter").value!=="all"&&r.region!==$("#region-filter").value)return false;
       const diet=$("#diet-filter").value;
-      if(diet==="vegetarian"&&!r.vegetarian)return false;
-      if(diet==="vegan"&&!r.vegan)return false;
-      if(diet==="nonveg"&&r.vegetarian)return false;
+      const facts=dietFacts(r);
+      if(diet==="vegetarian"&&!facts.vegetarian)return false;
+      if(diet==="vegan"&&!facts.vegan)return false;
+      if(diet==="nonveg"&&facts.vegetarian)return false;
       const tm=$("#time-filter").value;
       if(tm!=="all"&&r.minutes>=Number(tm))return false;
       if(mode==="saved"&&!saved.has(r.id))return false;
@@ -48,7 +51,7 @@
     grid.innerHTML=list.map((r,i)=>{
       const sc=activePantry.length?score(r,activePantry):null;
       const percent=sc?'<span class="match-pill">'+(sc.percent===100?"READY NOW":sc.found+"/"+sc.total+" ingredients")+'</span>':"";
-      return '<article class="recipe-card" tabindex="0" role="button" data-open="'+esc(r.id)+'"><div class="recipe-art art-'+(i%6)+'" data-image-slot="'+esc(r.id)+'"><span class="recipe-region">'+esc(r.region.toUpperCase())+' · '+esc(r.state.toUpperCase())+'</span><button class="heart '+(saved.has(r.id)?"is-saved":"")+'" data-save="'+esc(r.id)+'" aria-label="'+(saved.has(r.id)?"Remove from":"Save")+' favourites">'+(saved.has(r.id)?"♥":"♡")+'</button><span class="dish-initial">'+esc(r.title.slice(0,1))+'</span></div><div class="recipe-card-body"><div class="recipe-meta"><span>'+esc(r.kind.toUpperCase())+'</span><span>'+r.minutes+' MIN</span></div><h3>'+esc(r.title)+'</h3><p>'+esc(r.description)+'</p><div class="card-bottom">'+percent+'<span>'+ (r.vegan?"VEGAN":r.vegetarian?"VEGETARIAN":"CONTAINS MEAT / FISH")+'</span><b>↗</b></div></div></article>';
+      return '<article class="recipe-card" tabindex="0" role="button" data-open="'+esc(r.id)+'"><div class="recipe-art art-'+(i%6)+'" data-image-slot="'+esc(r.id)+'"><span class="recipe-region">'+esc(r.region.toUpperCase())+' · '+esc(r.state.toUpperCase())+'</span><button class="heart '+(saved.has(r.id)?"is-saved":"")+'" data-save="'+esc(r.id)+'" aria-label="'+(saved.has(r.id)?"Remove from":"Save")+' favourites">'+(saved.has(r.id)?"♥":"♡")+'</button><span class="dish-initial">'+esc(r.title.slice(0,1))+'</span></div><div class="recipe-card-body"><div class="recipe-meta"><span>'+esc(r.kind.toUpperCase())+'</span><span>'+r.minutes+' MIN</span></div><h3>'+esc(r.title)+'</h3><p>'+esc(r.description)+'</p><div class="card-bottom">'+percent+'<span>'+ (dietFacts(r).vegan?"VEGAN":dietFacts(r).vegetarian?"VEGETARIAN":"CONTAINS MEAT / FISH")+'</span><b>↗</b></div></div></article>';
     }).join("");
     hydrateCardPhotos(list);
   }
@@ -117,6 +120,7 @@
   }
   function renderDetail() {
     const r=current; if(!r)return;
+    const prep=prepGuidance(r);
     const ingredientRows=r.ingredients.map((i,n)=>{
       const qty=i.qty*servings/r.serves;
       const amount=Number.isInteger(qty)?qty:(Math.round(qty*10)/10);
@@ -125,13 +129,15 @@
       const opt=i.optional?" · optional":"";
       return '<li class="detail-ingredient"><label><input type="checkbox" data-check="'+n+'" '+(checks.has("i"+n)?"checked":"")+'> <span><strong>'+esc(amount+' '+unit+' '+i.name)+'</strong><small>'+esc(opt.trim()||"")+'</small></span></label>'+(alternatives.length?'<details class="swap"><summary>Swap options</summary><div>'+alternatives.map(a=>'<p><b>'+esc(a.name)+'</b> · '+esc(a.ratio)+' <span class="swap-level level-'+esc(a.level)+'">'+esc(a.level==="no-direct"?"NO DIRECT SWAP":a.level.toUpperCase())+'</span><br><small>'+esc(a.note)+'</small></p>').join("")+'</div></details>':'<details class="swap"><summary>No dependable swap reviewed</summary><div><p><b>No direct replacement listed</b> <span class="swap-level level-no-direct">NO DIRECT SWAP</span><br><small>For this recipe, leaving it out or choosing another dish may be more reliable. Omitting it can change the flavour or texture. Do not use an alternative for allergy-sensitive cooking without checking labels and cross-contact.</small></p></div></details>')+'</li>';
     }).join("");
-    $("#recipe-detail").innerHTML='<div class="detail-photo-slot" data-image-slot="'+esc(r.id)+'"></div><div class="detail-hero"><p class="eyebrow">'+esc(r.region.toUpperCase())+' · '+esc(r.state.toUpperCase())+' · '+r.minutes+' MIN</p><h2>'+esc(r.title)+'</h2><p>'+esc(r.description)+'</p><div class="detail-tools"><label>Serves <button type="button" data-servings="-1" aria-label="Fewer servings">−</button> <b>'+servings+'</b> <button type="button" data-servings="1" aria-label="More servings">+</button></label><button type="button" class="button button-outline" id="print-recipe">Print recipe</button><button type="button" class="button button-outline" id="save-detail">'+(saved.has(r.id)?"♥ Saved":"♡ Save recipe")+'</button></div></div><div class="detail-columns"><section><h3>Gather your ingredients</h3><ul class="ingredient-list">'+ingredientRows+'</ul><p class="allergy-note">Swap notes are cooking guidance, not allergy advice. Check labels and prevent cross-contact.</p></section><section><h3>Cook it, step by step</h3><ol class="step-list">'+r.steps.map((s,n)=>'<li><label><input type="checkbox" data-step="'+n+'" '+(checks.has("s"+n)?"checked":"")+'> <span>'+esc(s)+'</span></label></li>').join("")+'</ol>'+(r.tips?'<aside class="recipe-tip"><b>KITCHEN NOTE</b><p>'+esc(r.tips)+'</p></aside>':"")+'</section></div><div class="source-note"><b>About this version</b><p>Recipes in this growing atlas are practical home-kitchen interpretations. Methods and ingredient choices vary between families and regions; use the linked references as a starting point.</p><div>'+sources.map(s=>'<a href="'+esc(s.url)+'" target="_blank" rel="noreferrer">'+esc(s.label)+' ↗</a>').join("")+'</div></div>';
+    $("#recipe-detail").innerHTML='<div class="detail-photo-slot" data-image-slot="'+esc(r.id)+'"></div><div class="detail-hero"><p class="eyebrow">'+esc(r.region.toUpperCase())+' · '+esc(r.state.toUpperCase())+' · '+r.minutes+' MIN</p><h2>'+esc(r.title)+'</h2><p>'+esc(r.description)+'</p><div class="detail-tools"><label>Serves <button type="button" data-servings="-1" aria-label="Fewer servings">−</button> <b>'+servings+'</b> <button type="button" data-servings="1" aria-label="More servings">+</button></label><button type="button" class="button button-outline" id="print-recipe">Print recipe</button><button type="button" class="button button-outline" id="save-detail">'+(saved.has(r.id)?"♥ Saved":"♡ Save recipe")+'</button></div></div><aside class="prep-panel"><b>BEFORE YOU BEGIN</b><p>Read the full method first, measure the ingredients, and prepare the items mentioned in the steps.</p><p><strong>Useful equipment:</strong> '+esc(prep.tools)+'</p><p>'+esc(prep.extra)+'</p></aside><div class="detail-columns"><section><h3>Gather your ingredients</h3><ul class="ingredient-list">'+ingredientRows+'</ul><p class="allergy-note">Swap notes are cooking guidance, not allergy advice. Check labels and prevent cross-contact.</p></section><section><div class="steps-heading"><h3>Cook it, step by step</h3><span id="steps-progress">0 / '+r.steps.length+' done</span></div><ol class="step-list">'+r.steps.map((s,n)=>'<li><label><input type="checkbox" data-step="'+n+'" '+(checks.has("s"+n)?"checked":"")+'> <span>'+esc(s)+'</span></label></li>').join("")+'</ol>'+(r.tips?'<aside class="recipe-tip"><b>KITCHEN NOTE</b><p>'+esc(r.tips)+'</p></aside>':"")+'</section></div><div class="source-note"><b>About this version</b><p>Recipes in this growing atlas are practical home-kitchen interpretations. Methods and ingredient choices vary between families and regions; use the linked references as a starting point.</p><div>'+sources.map(s=>'<a href="'+esc(s.url)+'" target="_blank" rel="noreferrer">'+esc(s.label)+' ↗</a>').join("")+'</div></div>';
     const detailPhoto=$("#recipe-detail .detail-photo-slot");
     if(photoCache[r.id])showPhoto(detailPhoto,photoCache[r.id],r.title);
     else findPhoto(r).then(photo=>showPhoto(detailPhoto,photo,r.title));
     $("#recipe-detail").querySelectorAll("[data-servings]").forEach(b=>b.onclick=()=>{servings=Math.max(1,Math.min(20,servings+Number(b.dataset.servings)));renderDetail()});
     $("#recipe-detail").querySelectorAll("[data-check]").forEach(b=>b.onchange=()=>{b.checked?checks.add("i"+b.dataset.check):checks.delete("i"+b.dataset.check)});
-    $("#recipe-detail").querySelectorAll("[data-step]").forEach(b=>b.onchange=()=>{b.checked?checks.add("s"+b.dataset.step):checks.delete("s"+b.dataset.step)});
+    const stepBoxes=[...$("#recipe-detail").querySelectorAll("[data-step]")];
+    const updateProgress=()=>{const done=stepBoxes.filter(x=>x.checked).length;$("#steps-progress").textContent=done+" / "+stepBoxes.length+" done";};
+    stepBoxes.forEach(b=>b.onchange=()=>{b.checked?checks.add("s"+b.dataset.step):checks.delete("s"+b.dataset.step);updateProgress();});updateProgress();
     $("#print-recipe").onclick=()=>window.print();
     $("#save-detail").onclick=()=>toggleSaved(r.id);
   }
