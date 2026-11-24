@@ -1,5 +1,11 @@
 # Rasoi Atlas
 
+## Open the app
+
+[Launch Rasoi Atlas](https://makhara184.github.io/makhara184/apps/rasoi-atlas/) — use the live app in your browser. No GitHub account is needed.
+
+The files listed above are the source code; use the launch link to cook with the app.
+
 A browser-based Indian recipe atlas with a pantry matcher and ingredient alternatives. It is designed to grow beyond a short list of restaurant favourites by organising dishes across North, South, East, West, Central, and Northeast kitchens.
 
 ## What it does
