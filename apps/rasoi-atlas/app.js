@@ -56,9 +56,9 @@
     hydrateCardPhotos(list);
   }
   // Version 4 intentionally discards the old fuzzy matches saved by earlier releases.
-  const photoCache = read("photos-v4", {});
+  const photoCache = read("photos-v5", {});
   const photoPending = new Map();
-  function rememberPhotos(){write("photos-v4",photoCache);}
+  function rememberPhotos(){write("photos-v5",photoCache);}
   function showPhoto(slot, photo, dish){
     if(!slot||!photo?.thumb)return;
     slot.classList.add("has-photo");
@@ -76,8 +76,12 @@
     if(photoPending.has(recipe.id))return photoPending.get(recipe.id);
     const task=(async()=>{
       try{
+        const curatedFiles={chole:"File:Chana-masala.jpg","sarson-saag":"File:Sarson da saag.JPG"};
+        const curatedFile=curatedFiles[recipe.id];
         const query=encodeURIComponent('filetype:bitmap "'+recipe.title+'"');
-        const endpoint='https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch='+query+'&gsrnamespace=6&gsrlimit=12&prop=imageinfo&iiprop=url%7Cextmetadata&iiurlwidth=900&format=json&origin=*';
+        const endpoint=curatedFile
+          ?'https://commons.wikimedia.org/w/api.php?action=query&titles='+encodeURIComponent(curatedFile)+'&prop=imageinfo&iiprop=url%7Cextmetadata&iiurlwidth=900&format=json&origin=*'
+          :'https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch='+query+'&gsrnamespace=6&gsrlimit=12&prop=imageinfo&iiprop=url%7Cextmetadata&iiurlwidth=900&format=json&origin=*';
         const response=await fetch(endpoint);
         if(!response.ok)throw new Error("Photo search unavailable");
         const json=await response.json();
@@ -88,7 +92,7 @@
         const pages=Object.values(json.query?.pages||{});
         const match=pages.find(page=>{
           const filename=norm((page.title||"").replace(/^file\s/,""));
-          if(!wanted.length||!wanted.every(t=>filename.split(" ").includes(t)))return false;
+          if(!curatedFile&&(!wanted.length||!wanted.every(t=>filename.split(" ").includes(t))))return false;
           const imagePlaces=placeNames.filter(place=>filename.includes(place));
           if(imagePlaces.length&&!imagePlaces.some(place=>recipePlaces.includes(place)))return false;
           return !!page.imageinfo?.[0]?.thumburl;
