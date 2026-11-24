@@ -19,7 +19,7 @@ A responsive, installable portfolio of ten focused browser apps. Each app has it
 
 ## Run or publish
 
-Open `index.html` directly for basic use, or serve this folder from localhost/HTTPS to enable app installation and service-worker caching. GitHub Pages deployment is configured in `.github/workflows/pages.yml`; the first Actions run enables Pages for the repository, then publishes the site. Subsequent pushes to `main` publish updates.
+Open `index.html` directly for basic use, or serve this folder from localhost/HTTPS to enable app installation and service-worker caching. The source is saved on GitHub; live hosting is opt-in. When ready, select **GitHub Actions** as the Pages source under repository Settings → Pages, then run the `Publish portfolio apps to GitHub Pages` workflow from Actions. It is manual-only so source updates do not attempt to publish before Pages is enabled.
 
 ## Privacy and limits
 
