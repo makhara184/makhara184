@@ -9,6 +9,8 @@ I build useful software with a sense of craft: browser applications, creative to
 - **[NotchBuddy for macOS](https://github.com/makhara184/notch-buddy-macos)** — a native reminder companion concept.
 - **[GIS Gurugram portfolio](https://github.com/makhara184/GIS-Gurugram-Portfolio)** — spatial-data work and mapping exploration.
 
+- **[Rasoi Atlas](https://github.com/makhara184/makhara184/tree/main/apps/rasoi-atlas)** — a growing Indian recipe atlas with a pantry matcher, regional browsing, and transparent substitution guidance.
+
 ## What I work with
 
 JavaScript · HTML · CSS · Swift · Python · GitHub Actions
