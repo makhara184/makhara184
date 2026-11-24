@@ -55,9 +55,9 @@
     }).join("");
     hydrateCardPhotos(list);
   }
-  const photoCache = read("photos-v2", {});
+  const photoCache = read("photos-v3", {});
   const photoPending = new Map();
-  function rememberPhotos(){write("photos-v2",photoCache);}
+  function rememberPhotos(){write("photos-v3",photoCache);}
   function showPhoto(slot, photo, dish){
     if(!slot||!photo?.thumb)return;
     slot.classList.add("has-photo");
