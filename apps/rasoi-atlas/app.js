@@ -56,9 +56,9 @@
     hydrateCardPhotos(list);
   }
   // Version 4 intentionally discards the old fuzzy matches saved by earlier releases.
-  const photoCache = read("photos-v6", {});
+  const photoCache = read("photos-v7", {});
   const photoPending = new Map();
-  function rememberPhotos(){write("photos-v6",photoCache);}
+  function rememberPhotos(){write("photos-v7",photoCache);}
   function showPhoto(slot, photo, dish){
     if(!slot||!photo?.thumb)return;
     slot.classList.add("has-photo");
@@ -76,7 +76,7 @@
     if(photoPending.has(recipe.id))return photoPending.get(recipe.id);
     const task=(async()=>{
       try{
-        const curatedFiles={chole:"File:Chickpea Curry - Kolkata 2011-03-05 1910.JPG","sarson-saag":"File:Sarson da saag.JPG"};
+        const curatedFiles={chole:"File:Chole Masala India.jpg","sarson-saag":"File:Sarson da saag.JPG"};
         const curatedFile=curatedFiles[recipe.id];
         const query=encodeURIComponent('filetype:bitmap "'+recipe.title+'"');
         const endpoint=curatedFile
