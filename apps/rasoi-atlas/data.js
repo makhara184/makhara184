@@ -155,7 +155,7 @@ window.RASOI_DATA = (() => {
     "whole-wheat flour":[{name:"atta",ratio:"1:1",level:"close",note:"Atta is whole-wheat flour; water absorption varies."}]
   };
   const sources=[
-    {label:"NNWA — 150 Indian recipes by region",url:"https://nnwa.in/recipes/",note:"Recipe and technique cross-reference; this app's instructions are independently written."},
+    {label:"NNWA — 200 Indian recipes by region",url:"https://nnwa.in/recipes/",note:"Recipe and technique cross-reference; this app's instructions are independently written."},
     {label:"Indian Community Cookbook Project — open archive",url:"https://www.indiancommunitycookbookproject.com/archives/categories/archives",note:"Community cookbooks, regional recipe histories, and food memories."},
     {label:"National Council for Hotel Management — Indian Culinary Arts syllabus",url:"https://ihmgoa.gov.in/uploads/content_files/0_143_1716895344.pdf",note:"Regional menus and a list of tribal, festival, and overlooked dishes."},
     {label:"India eCookbook — regional cooking culture",url:"https://mecs.org.uk/wp-content/uploads/2022/03/India-eCookbook-V2.1.pdf",note:"An accessible regional overview and home-cooking reference."}
