@@ -1,0 +1,89 @@
+(() => {
+  const { recipes, substitutions, sources } = window.RASOI_DATA || {};
+  if (!recipes?.length) return;
+  const $ = (s, root=document) => root.querySelector(s);
+  const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem("rasoi."+key)) ?? fallback; } catch { return fallback; } };
+  const write = (key, val) => { try { localStorage.setItem("rasoi."+key, JSON.stringify(val)); } catch {} };
+  const aliases = new Map();
+  [["potatoes","potato"],["tomatoes","tomato"],["onions","onion"],["garlic cloves","garlic"],["ginger root","ginger"],["cilantro","fresh cilantro"],["coriander leaves","fresh cilantro"],["coriander leaf","fresh cilantro"],["chickpea flour","besan"],["gram flour","besan"],["chickpeas","dried chickpeas"],["chana","dried chickpeas"],["kidney beans","dried kidney beans"],["rajma","dried kidney beans"],["yoghurt","plain yogurt"],["curd","plain yogurt"],["coriander powder","coriander powder"],["green chillies","green chili"],["chillies","green chili"],["chili","green chili"],["chilli","green chili"],["oil","neutral oil"],["vegetable oil","neutral oil"],["rice","rice"],["basmati rice","rice"],["lemons","lemon"],["limes","lime"],["curry leaf","curry leaves"],["curry leaves","curry leaves"],["spinach leaves","spinach"],["flour","plain flour"],["wheat flour","whole-wheat flour"]].forEach(([a,b])=>aliases.set(norm(a),norm(b)));
+  const canon = s => aliases.get(norm(s)) || norm(s);
+  const pantry = read("pantry", []);
+  let activePantry = [];
+  let saved = new Set(read("saved", []));
+  let mode = "all", current = null, servings = 4, checks = new Set();
+  const pantryInput=$("#pantry-input"), grid=$("#recipe-grid"), dialog=$("#recipe-dialog");
+  const toast = msg => { const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toast.timer); toast.timer=setTimeout(()=>t.classList.remove("show"),2400); };
+  const pantryTokens = v => [...new Set(String(v).split(/[,;\n]+/).map(x=>canon(x)).filter(Boolean))];
+  const ingredientMatch = (item, tokens) => { const name=canon(item.name); return tokens.some(t=>t===name || (t.length>3 && name.includes(t)) || (name.length>3 && t.includes(name))); };
+  const score = (r,tokens) => { const needed=r.ingredients.filter(i=>!i.optional); const found=needed.filter(i=>ingredientMatch(i,tokens)); return {found:found.length,total:needed.length,missing:needed.filter(i=>!ingredientMatch(i,tokens)),percent:needed.length?Math.round(found.length/needed.length*100):0}; };
+  const pretty = s => String(s).replace(/\b\w/g,m=>m.toUpperCase());
+  function updateChips() {
+    const box=$("#pantry-chips"); if(!box)return;
+    box.innerHTML=activePantry.length?activePantry.map(x=>'<span class="pantry-chip">'+esc(pretty(x))+'</span>').join(""):"";
+  }
+  function draw() {
+    if(!grid)return;
+    let list=recipes.filter(r=>{
+      const q=norm($("#search").value);
+      const hay=norm([r.title,r.region,r.state,r.kind,r.description,...r.ingredients.map(i=>i.name)].join(" "));
+      if(q && !hay.includes(q))return false;
+      if($("#region-filter").value!=="all"&&r.region!==$("#region-filter").value)return false;
+      const diet=$("#diet-filter").value;
+      if(diet==="vegetarian"&&!r.vegetarian)return false;
+      if(diet==="vegan"&&!r.vegan)return false;
+      if(diet==="nonveg"&&r.vegetarian)return false;
+      const tm=$("#time-filter").value;
+      if(tm!=="all"&&r.minutes>=Number(tm))return false;
+      if(mode==="saved"&&!saved.has(r.id))return false;
+      return true;
+    });
+    if(mode==="pantry"&&activePantry.length) list.sort((a,b)=>score(b,activePantry).percent-score(a,activePantry).percent || score(b,activePantry).missing.length-score(a,activePantry).missing.length);
+    if($("#sort").value==="quick")list.sort((a,b)=>a.minutes-b.minutes);
+    if($("#sort").value==="az")list.sort((a,b)=>a.title.localeCompare(b.title));
+    $("#results-count").textContent=list.length+" "+(list.length===1?"recipe":"recipes");
+    $("#active-message").textContent=mode==="pantry"&&activePantry.length?"Ranked by ingredients you already have · open a card to see what’s missing.":mode==="saved"?"Your saved recipes on this device.":"";
+    $("#empty-state").hidden=!!list.length;
+    grid.innerHTML=list.map((r,i)=>{
+      const sc=activePantry.length?score(r,activePantry):null;
+      const percent=sc?'<span class="match-pill">'+(sc.percent===100?"READY NOW":sc.found+"/"+sc.total+" ingredients")+'</span>':"";
+      return '<article class="recipe-card" tabindex="0" role="button" data-open="'+esc(r.id)+'"><div class="recipe-art art-'+(i%6)+'"><span class="recipe-region">'+esc(r.region.toUpperCase())+' · '+esc(r.state.toUpperCase())+'</span><button class="heart '+(saved.has(r.id)?"is-saved":"")+'" data-save="'+esc(r.id)+'" aria-label="'+(saved.has(r.id)?"Remove from":"Save")+' favourites">'+(saved.has(r.id)?"♥":"♡")+'</button><span class="dish-initial">'+esc(r.title.slice(0,1))+'</span></div><div class="recipe-card-body"><div class="recipe-meta"><span>'+esc(r.kind.toUpperCase())+'</span><span>'+r.minutes+' MIN</span></div><h3>'+esc(r.title)+'</h3><p>'+esc(r.description)+'</p><div class="card-bottom">'+percent+'<span>'+ (r.vegan?"VEGAN":r.vegetarian?"VEGETARIAN":"CONTAINS MEAT / FISH")+'</span><b>↗</b></div></div></article>';
+    }).join("");
+  }
+  function showRecipe(id) {
+    const r=recipes.find(x=>x.id===id); if(!r)return; current=r; servings=r.serves; checks=new Set(); renderDetail(); dialog.showModal();
+  }
+  function renderDetail() {
+    const r=current; if(!r)return;
+    const ingredientRows=r.ingredients.map((i,n)=>{
+      const qty=i.qty*servings/r.serves;
+      const amount=Number.isInteger(qty)?qty:(Math.round(qty*10)/10);
+      const unit=i.unit||"";
+      const alternatives=substitutions[norm(i.name)]||[];
+      const opt=i.optional?" · optional":"";
+      return '<li class="detail-ingredient"><label><input type="checkbox" data-check="'+n+'" '+(checks.has("i"+n)?"checked":"")+'> <span><strong>'+esc(amount+' '+unit+' '+i.name)+'</strong><small>'+esc(opt.trim()||"")+'</small></span></label>'+(alternatives.length?'<details class="swap"><summary>Swap options</summary><div>'+alternatives.map(a=>'<p><b>'+esc(a.name)+'</b> · '+esc(a.ratio)+' <span class="swap-level level-'+esc(a.level)+'">'+esc(a.level==="no-direct"?"NO DIRECT SWAP":a.level.toUpperCase())+'</span><br><small>'+esc(a.note)+'</small></p>').join("")+'</div></details>':'<span class="no-swap">No reviewed swap listed</span>')+'</li>';
+    }).join("");
+    $("#recipe-detail").innerHTML='<div class="detail-hero"><p class="eyebrow">'+esc(r.region.toUpperCase())+' · '+esc(r.state.toUpperCase())+' · '+r.minutes+' MIN</p><h2>'+esc(r.title)+'</h2><p>'+esc(r.description)+'</p><div class="detail-tools"><label>Serves <button type="button" data-servings="-1" aria-label="Fewer servings">−</button> <b>'+servings+'</b> <button type="button" data-servings="1" aria-label="More servings">+</button></label><button type="button" class="button button-outline" id="print-recipe">Print recipe</button><button type="button" class="button button-outline" id="save-detail">'+(saved.has(r.id)?"♥ Saved":"♡ Save recipe")+'</button></div></div><div class="detail-columns"><section><h3>Gather your ingredients</h3><ul class="ingredient-list">'+ingredientRows+'</ul><p class="allergy-note">Swap notes are cooking guidance, not allergy advice. Check labels and prevent cross-contact.</p></section><section><h3>Cook it, step by step</h3><ol class="step-list">'+r.steps.map((s,n)=>'<li><label><input type="checkbox" data-step="'+n+'" '+(checks.has("s"+n)?"checked":"")+'> <span>'+esc(s)+'</span></label></li>').join("")+'</ol>'+(r.tips?'<aside class="recipe-tip"><b>KITCHEN NOTE</b><p>'+esc(r.tips)+'</p></aside>':"")+'</section></div><div class="source-note"><b>About this version</b><p>Recipes in this growing atlas are practical home-kitchen interpretations. Methods and ingredient choices vary between families and regions; use the linked references as a starting point.</p><div>'+sources.map(s=>'<a href="'+esc(s.url)+'" target="_blank" rel="noreferrer">'+esc(s.label)+' ↗</a>').join("")+'</div></div>';
+    $("#recipe-detail").querySelectorAll("[data-servings]").forEach(b=>b.onclick=()=>{servings=Math.max(1,Math.min(20,servings+Number(b.dataset.servings)));renderDetail()});
+    $("#recipe-detail").querySelectorAll("[data-check]").forEach(b=>b.onchange=()=>{b.checked?checks.add("i"+b.dataset.check):checks.delete("i"+b.dataset.check)});
+    $("#recipe-detail").querySelectorAll("[data-step]").forEach(b=>b.onchange=()=>{b.checked?checks.add("s"+b.dataset.step):checks.delete("s"+b.dataset.step)});
+    $("#print-recipe").onclick=()=>window.print();
+    $("#save-detail").onclick=()=>toggleSaved(r.id);
+  }
+  function toggleSaved(id){if(saved.has(id))saved.delete(id);else saved.add(id);saved=[...saved];write("saved",saved);saved=new Set(saved);$("#saved-count").textContent=saved.size;draw();if(current?.id===id)$("#save-detail").textContent=saved.has(id)?"♥ Saved":"♡ Save recipe";}
+  function runPantry(){activePantry=pantryTokens(pantryInput.value);write("pantry",activePantry);mode="pantry";updateChips();draw();$("#discover").scrollIntoView({behavior:"smooth"});if(!activePantry.length)toast("Add a few ingredients first.");}
+  $("#find-pantry").onclick=runPantry;
+  $("#pantry-clear").onclick=()=>{pantryInput.value="";activePantry=[];mode="all";write("pantry",[]);updateChips();draw();};
+  pantryInput.value=pantry.join(", ");
+  ["search","region-filter","diet-filter","time-filter","sort"].forEach(id=>$("#"+id).addEventListener(id==="search"?"input":"change",()=>{mode=mode==="saved"?"saved":"all";draw()}));
+  $("#clear-filters").onclick=()=>{$("#search").value="";$("#region-filter").value="all";$("#diet-filter").value="all";$("#time-filter").value="all";$("#sort").value="featured";mode="all";activePantry=[];updateChips();draw()};
+  $("#empty-reset").onclick=$("#clear-filters").onclick;
+  $("#saved-link").onclick=()=>{mode=mode==="saved"?"all":"saved";$("#discover").scrollIntoView({behavior:"smooth"});draw();};
+  grid.addEventListener("click",e=>{const fave=e.target.closest("[data-save]");if(fave){e.stopPropagation();toggleSaved(fave.dataset.save);return}const card=e.target.closest("[data-open]");if(card)showRecipe(card.dataset.open);});
+  grid.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.matches("[data-open]")){e.preventDefault();showRecipe(e.target.dataset.open)}});
+  dialog.addEventListener("click",e=>{if(e.target===dialog)dialog.close()});
+  $("#saved-count").textContent=saved.size;
+  const count=$(".hero-foot span"); if(count)count.textContent=recipes.length+" RECIPES TO BEGIN WITH";
+  updateChips(); draw();
+})();
